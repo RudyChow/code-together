@@ -1,0 +1,13 @@
+[Http]
+Addr="0.0.0.0:27000"
+Mode="debug"
+
+[Manager]
+# 最多有x个房间
+RoomCount=100
+# 房间过期时间
+RoomExpire=3600
+# 房间最多有x个客户端
+ClientCount=2
+# 每次同步的间隔
+SyncGap=3
