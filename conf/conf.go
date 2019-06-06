@@ -23,7 +23,7 @@ type roomManager struct {
 	RoomCount   int
 	RoomExpire  int64
 	ClientCount int
-	SyncGap     int64
+	ChargeGap   int
 }
 
 func init() {

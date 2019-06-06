@@ -25,3 +25,19 @@ func MessageResponse(data interface{}) *Response {
 	response.Type = "message"
 	return response
 }
+
+func CodeResponse(data interface{}) *Response {
+	response := &Response{
+		Data: data,
+	}
+	response.Type = "code"
+	return response
+}
+
+func ChargeResponse(data interface{}) *Response {
+	response := &Response{
+		Data: data,
+	}
+	response.Type = "charge"
+	return response
+}

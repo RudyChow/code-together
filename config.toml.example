@@ -9,5 +9,5 @@ RoomCount=100
 RoomExpire=3600
 # 房间最多有x个客户端
 ClientCount=2
-# 每次同步的间隔
-SyncGap=3
+# 控制权间隔
+ChargeGap=3

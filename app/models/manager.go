@@ -2,29 +2,25 @@ package models
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"time"
 
-	"github.com/RudyChow/code-together/app/ws/messages"
 	"github.com/RudyChow/code-together/conf"
 )
 
 var RoomManager *roomManager
 
 type roomManager struct {
-	rooms           map[string]*Room
-	SyncCh          chan *Client
-	LeaveCh         chan *Client
-	RoomBroadcastCh chan string
+	rooms   map[string]*Room
+	SyncCh  chan *Client
+	LeaveCh chan *Client
 }
 
 func init() {
 	RoomManager = &roomManager{
-		rooms:           make(map[string]*Room),
-		SyncCh:          make(chan *Client, 100),
-		LeaveCh:         make(chan *Client, 100),
-		RoomBroadcastCh: make(chan string, 100),
+		rooms:   make(map[string]*Room),
+		SyncCh:  make(chan *Client, 128),
+		LeaveCh: make(chan *Client, 128),
 	}
 }
 
@@ -40,9 +36,7 @@ func (manager *roomManager) Run() {
 		// 离开房间
 		case client := <-manager.LeaveCh:
 			manager.leave(client)
-		// 广播房间信息
-		case roomID := <-manager.RoomBroadcastCh:
-			manager.roomBroadcast(roomID)
+		// gc
 		case <-ticker.C:
 			manager.gc()
 		}
@@ -57,8 +51,7 @@ func (manager *roomManager) Join(c *Client) error {
 		return errors.New("没有空闲房间了惹")
 	}
 	if !ok {
-		manager.rooms[c.RoomID] = NewRoom()
-		manager.rooms[c.RoomID].LastModUser = c.Username
+		manager.rooms[c.RoomID] = NewRoom(c.RoomID)
 	}
 
 	// 房间人数判断
@@ -66,50 +59,31 @@ func (manager *roomManager) Join(c *Client) error {
 		return errors.New("满人了惹")
 	}
 	manager.rooms[c.RoomID].Clients[c.Username] = c
-
-	// 广播	房间信息
-	manager.RoomBroadcastCh <- c.RoomID
 	return nil
+}
+
+func (manager *roomManager) GetRooms() map[string]*Room {
+	return manager.rooms
 }
 
 // 同步代码
 func (manager *roomManager) sync(c *Client) {
-	now := time.Now().Unix()
-	// 如果最后修改人不是自己 并且 具体最后修改时间x秒内 则不可进行修改
-	if manager.rooms[c.RoomID].LastModUser != c.Username && now-manager.rooms[c.RoomID].LastModTime <= conf.Cfg.Manager.SyncGap {
-		c.SendData(messages.MessageResponse(fmt.Sprintf("%s is coding..", manager.rooms[c.RoomID].LastModUser)))
-		return
-	}
-	manager.rooms[c.RoomID].Language = c.language
-	manager.rooms[c.RoomID].Version = c.version
-	manager.rooms[c.RoomID].Code = c.code
-	manager.rooms[c.RoomID].LastModUser = c.Username
-	manager.rooms[c.RoomID].LastModTime = now
-	manager.RoomBroadcastCh <- c.RoomID
+	manager.rooms[c.RoomID].syncCode(c)
+	manager.rooms[c.RoomID].boardcastCh <- struct{}{}
 }
 
 // 客户端离开
 func (manager *roomManager) leave(c *Client) {
 	log.Printf("client %v is leaving", c.Username)
-	_, ok := manager.rooms[c.RoomID]
-	//如果房间存在，则删除房间内该用户
-	if ok {
+	if _, ok := manager.rooms[c.RoomID]; ok {
+		//如果房间存在，则删除房间内该用户
 		delete(manager.rooms[c.RoomID].Clients, c.Username)
 		//如果房间没人了，则删除房间
 		if len(manager.rooms[c.RoomID].Clients) == 0 {
 			delete(manager.rooms, c.RoomID)
+		} else {
+			manager.rooms[c.RoomID].boardcastCh <- struct{}{}
 		}
-	}
-	manager.RoomBroadcastCh <- c.RoomID
-}
-
-// 广播房间信息
-func (manager *roomManager) roomBroadcast(roomID string) {
-	if _, ok := manager.rooms[roomID]; !ok {
-		return
-	}
-	for _, client := range manager.rooms[roomID].Clients {
-		client.sendCh <- messages.RoomResponse(manager.rooms[roomID])
 	}
 }
 
@@ -128,8 +102,4 @@ func (manager *roomManager) gc() {
 
 		delete(manager.rooms, roomID)
 	}
-}
-
-func (manager *roomManager) GetRooms() map[string]*Room {
-	return manager.rooms
 }

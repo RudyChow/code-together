@@ -95,7 +95,7 @@ func (c *Client) Read() {
 			RoomManager.SyncCh <- c
 		//拉取代码
 		case "pull":
-			RoomManager.RoomBroadcastCh <- c.RoomID
+			c.sendCh <- messages.CodeResponse(RoomManager.rooms[c.RoomID])
 		}
 
 	}
@@ -133,12 +133,7 @@ func (c *Client) Send() {
 
 // SendInfo : 发送个人信息
 func (c *Client) SendInfo() {
-	c.SendData(messages.InfoResponse(c))
-}
-
-// SendData : 发送数据
-func (c *Client) SendData(data interface{}) {
-	c.sendCh <- data
+	c.sendCh <- messages.InfoResponse(c)
 }
 
 // 关闭socket
